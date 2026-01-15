@@ -5,8 +5,8 @@ import plotly.graph_objects as go
 import os
 import tempfile
 import time
-import io
 import base64
+from io import BytesIO
 
 # Set page config for better display
 st.set_page_config(
@@ -28,15 +28,11 @@ uploaded_files = st.file_uploader(
 if uploaded_files:
     try:
         # Chart type selection
-        chart_types = ['Bar', 'Line', 'Scatter', 'Pie', 'Area']
+        chart_types = ['Bar', 'Line', 'Scatter', 'Pie']
         selected_chart_type = st.selectbox('Choose chart type', chart_types)
 
-        # Color palette options - using a fixed set to avoid issues
-        color_palette_options = [
-            'Plotly', 'G10', 'T10', 'Alphabet', 'Dark24', 'Light24'
-        ]
-
-        # Use a selectbox for palette selection
+        # Use a fixed set of color palettes
+        color_palette_options = ['Plotly', 'G10', 'T10', 'Alphabet']
         selected_palette_name = st.selectbox('Choose a color palette', options=color_palette_options)
 
         # Display options
@@ -52,9 +48,6 @@ if uploaded_files:
         text_color = st.radio('Text color', ['Black', 'White'])
         bg_color = st.radio('Background color', ['White', 'Black'])
 
-        # Export options
-        export_format = st.selectbox('Export format', ['PNG', 'JPEG'])
-
         def get_fig(data, chart_type, palette_name):
             # Get colors from the selected palette
             if palette_name == 'Plotly':
@@ -63,12 +56,8 @@ if uploaded_files:
                 colors = px.colors.qualitative.G10
             elif palette_name == 'T10':
                 colors = px.colors.qualitative.T10
-            elif palette_name == 'Alphabet':
+            else:  # Alphabet
                 colors = px.colors.qualitative.Alphabet
-            elif palette_name == 'Dark24':
-                colors = px.colors.qualitative.Dark24
-            else:  # Light24
-                colors = px.colors.qualitative.Light24
 
             # Determine text color based on background
             effective_text_color = 'white' if bg_color == 'Black' else 'black'
@@ -77,81 +66,61 @@ if uploaded_files:
             fig = go.Figure()
 
             # Check if required columns exist
-            required_cols = ['concelhos', 'Sim', 'Não', 'Ns/Nr']
-            for col in required_cols:
-                if col not in data.columns:
-                    st.warning(f"Column '{col}' not found in the CSV file. Using first 4 columns instead.")
-                    # Use first 4 columns if required columns don't exist
-                    if len(data.columns) >= 4:
-                        data.columns = ['concelhos'] + list(data.columns[1:4])
-                    else:
-                        st.error("CSV file doesn't have enough columns (need at least 4)")
-                        return None
-                    break
+            if 'concelhos' not in data.columns:
+                st.warning("Column 'concelhos' not found. Using first column as x-axis.")
+                data = data.rename(columns={data.columns[0]: 'concelhos'})
+
+            # Get data columns (skip the first column which we assume is x-axis)
+            data_columns = [col for col in data.columns if col != 'concelhos']
 
             if chart_type == 'Bar':
-                for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
-                    if col in data.columns:
-                        fig.add_trace(go.Bar(
-                            x=data['concelhos'],
-                            y=data[col],
-                            name=col,
-                            marker_color=colors[i % len(colors)],
-                            text=data[col] if show_bar_values else None,
-                            textposition='outside' if show_bar_values else None,
-                            textfont=dict(color=effective_text_color)
-                        ))
+                for i, col in enumerate(data_columns[:3]):  # Limit to first 3 data columns
+                    fig.add_trace(go.Bar(
+                        x=data['concelhos'],
+                        y=data[col],
+                        name=col,
+                        marker_color=colors[i % len(colors)],
+                        text=data[col] if show_bar_values else None,
+                        textposition='outside' if show_bar_values else None,
+                        textfont=dict(color=effective_text_color)
+                    ))
                 fig.update_layout(barmode='group')
 
             elif chart_type == 'Line':
-                for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
-                    if col in data.columns:
-                        fig.add_trace(go.Scatter(
-                            x=data['concelhos'],
-                            y=data[col],
-                            name=col,
-                            mode='lines+markers',
-                            line=dict(color=colors[i % len(colors)]),
-                            text=data[col] if show_bar_values else None,
-                            textposition='top center' if show_bar_values else None,
-                            textfont=dict(color=effective_text_color)
-                        ))
+                for i, col in enumerate(data_columns[:3]):  # Limit to first 3 data columns
+                    fig.add_trace(go.Scatter(
+                        x=data['concelhos'],
+                        y=data[col],
+                        name=col,
+                        mode='lines+markers',
+                        line=dict(color=colors[i % len(colors)]),
+                        text=data[col] if show_bar_values else None,
+                        textposition='top center' if show_bar_values else None,
+                        textfont=dict(color=effective_text_color)
+                    ))
 
             elif chart_type == 'Scatter':
-                for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
-                    if col in data.columns:
-                        fig.add_trace(go.Scatter(
-                            x=data['concelhos'],
-                            y=data[col],
-                            name=col,
-                            mode='markers',
-                            marker=dict(color=colors[i % len(colors)]),
-                            text=data[col] if show_bar_values else None,
-                            textposition='top center' if show_bar_values else None,
-                            textfont=dict(color=effective_text_color)
-                        ))
+                for i, col in enumerate(data_columns[:3]):  # Limit to first 3 data columns
+                    fig.add_trace(go.Scatter(
+                        x=data['concelhos'],
+                        y=data[col],
+                        name=col,
+                        mode='markers',
+                        marker=dict(color=colors[i % len(colors)]),
+                        text=data[col] if show_bar_values else None,
+                        textposition='top center' if show_bar_values else None,
+                        textfont=dict(color=effective_text_color)
+                    ))
 
             elif chart_type == 'Pie':
-                if len(data.columns) > 1:
+                if len(data_columns) > 0:
                     fig.add_trace(go.Pie(
-                        labels=data.columns[1:4],  # Use first 3 data columns
-                        values=data.iloc[0, 1:4],
+                        labels=data_columns[:3],  # Limit to first 3 data columns
+                        values=data.iloc[0, 1:4],  # First row, first 3 data columns
                         marker=dict(colors=colors[:3]),
                         textinfo='label+percent' if show_bar_values else 'label',
                         textfont=dict(color=effective_text_color)
                     ))
-
-            elif chart_type == 'Area':
-                for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
-                    if col in data.columns:
-                        fig.add_trace(go.Scatter(
-                            x=data['concelhos'],
-                            y=data[col],
-                            name=col,
-                            stackgroup='one',
-                            fillcolor=colors[i % len(colors)],
-                            line=dict(color=colors[i % len(colors)])
-                        ))
 
             # Set background and layout
             fig.update_layout(
@@ -159,13 +128,13 @@ if uploaded_files:
                 plot_bgcolor='black' if bg_color == 'Black' else 'white',
                 font=dict(color=effective_text_color),
                 xaxis=dict(
-                    title=dict(font=dict(color=effective_text_color)) if show_x_label else None,
+                    title=dict(text='Concelhos' if show_x_label else '', font=dict(color=effective_text_color)),
                     tickfont=dict(color=effective_text_color),
                     gridcolor='rgba(200, 200, 200, 0.3)' if bg_color == 'White' else 'rgba(100, 100, 100, 0.5)',
                     showgrid=True,
                 ),
                 yaxis=dict(
-                    title=dict(font=dict(color=effective_text_color)) if show_y_label else None,
+                    title=dict(text='Percentage' if show_y_label else '', font=dict(color=effective_text_color)),
                     tickfont=dict(color=effective_text_color),
                     gridcolor='rgba(200, 200, 200, 0.3)' if bg_color == 'White' else 'rgba(100, 100, 100, 0.5)',
                     showgrid=True,
@@ -180,7 +149,7 @@ if uploaded_files:
                 ),
                 margin=dict(l=50, r=50, b=80, t=100, pad=10),
                 height=600,
-                title_text=f'Responses by Concelhos' if show_title else '',
+                title_text='Responses by Concelhos' if show_title else '',
             )
 
             return fig
@@ -190,7 +159,11 @@ if uploaded_files:
                 try:
                     with st.spinner(f'Processing {uploaded_file.name}...'):
                         # Read CSV file
-                        data = pd.read_csv(uploaded_file)
+                        try:
+                            data = pd.read_csv(uploaded_file)
+                        except Exception as e:
+                            st.error(f"Error reading {uploaded_file.name}: {str(e)}")
+                            continue
 
                         # Show data preview
                         with st.expander(f"Data Preview: {uploaded_file.name}"):
@@ -203,6 +176,7 @@ if uploaded_files:
                 except Exception as e:
                     st.error(f"Error processing {uploaded_file.name}: {str(e)}")
 
+        # Export functionality - simplified to avoid memory issues
         if st.button('Export Current Chart'):
             for uploaded_file in uploaded_files:
                 try:
@@ -211,15 +185,15 @@ if uploaded_files:
                         fig = get_fig(data, selected_chart_type, selected_palette_name)
 
                         if fig:
-                            # Convert figure to image
-                            img_bytes = fig.to_image(format=export_format.lower())
+                            # Create a download link for the chart
+                            img_bytes = fig.to_image(format="png")
 
                             # Create download button
                             st.download_button(
-                                label=f"Download {uploaded_file.name} as {export_format}",
+                                label=f"Download {uploaded_file.name} as PNG",
                                 data=img_bytes,
-                                file_name=f"chart_{os.path.splitext(uploaded_file.name)[0]}.{export_format.lower()}",
-                                mime=f"image/{export_format.lower()}",
+                                file_name=f"chart_{os.path.splitext(uploaded_file.name)[0]}.png",
+                                mime="image/png",
                                 key=f"download_{uploaded_file.name}"
                             )
                 except Exception as e:
