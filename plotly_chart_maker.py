@@ -9,8 +9,6 @@ import zipfile
 # Language translations
 TRANSLATIONS = {
     'en': {
-        'title': '📊 CSV to Chart Converter with Plotly',
-        '######': 'by brunurb',
         'upload': 'Choose CSV files',
         'chart_type': 'Choose chart type',
         'color_palette': '🎨 Color Palette Previews',
@@ -61,7 +59,6 @@ TRANSLATIONS = {
         'transparent': 'Transparent'
     },
     'pt': {
-        'title': '📊 Conversor de CSV para Gráficos com Plotly',
         'upload': 'Escolha ficheiros CSV',
         'chart_type': 'Escolha o tipo de gráfico',
         'color_palette': '🎨 Pré-visualização de Paletas de Cores',
@@ -159,6 +156,7 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
+
 
 # File uploader
 uploaded_files = st.file_uploader(t['upload'], type="csv", accept_multiple_files=True)
