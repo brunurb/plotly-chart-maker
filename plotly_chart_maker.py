@@ -4,6 +4,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import os
 from io import BytesIO
+import zipfile
 
 st.set_page_config(page_title="ChartMaker", page_icon="📊", layout="wide")
 
@@ -67,6 +68,10 @@ if uploaded_files:
         st.write("### 🎨 Style Options")
         text_color = st.radio('Text color', ['Black', 'White'])
         bg_color = st.radio('Background color', ['White', 'Black', 'Transparent'])
+
+    # Export format selection
+    st.write("### 💾 Export Options")
+    export_format = st.selectbox('Export format', ['PNG', 'SVG', 'PDF', 'HTML'])
 
     def get_fig(data, chart_type, palette_name, filename=None):
         colors = px.colors.qualitative.__dict__[palette_name]
@@ -157,6 +162,7 @@ if uploaded_files:
             'legend_title_text': '',
             'margin': dict(l=60, r=60, b=80, t=100, pad=10),
             'height': 600,
+            'width': 1200,
             'autosize': False
         }
 
@@ -238,43 +244,141 @@ if uploaded_files:
 
                 fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
                 
-                # Display chart with config for download
+                # Display chart
                 st.plotly_chart(
                     fig, 
                     use_container_width=True, 
-                    key=f"chart_{uploaded_file.name}",
-                    config={
-                        'toImageButtonOptions': {
-                            'format': 'png',
-                            'filename': f'chart_{os.path.splitext(uploaded_file.name)[0]}',
-                            'height': 600,
-                            'width': 1200,
-                            'scale': 2
-                        },
-                        'displayModeBar': True,
-                        'displaylogo': False,
-                        'modeBarButtonsToRemove': ['pan2d', 'lasso2d']
-                    }
+                    key=f"chart_{uploaded_file.name}"
                 )
-                
-                st.info("💡 Use the 📷 camera icon in the chart toolbar above to download as PNG")
                 
             except Exception as e:
                 st.error(f"Error processing {uploaded_file.name}: {str(e)}")
 
-    # Add a helpful note
+    # Export all charts button
+    if st.button('📦 Export All Charts', type="secondary"):
+        try:
+            # Create a ZIP file in memory
+            zip_buffer = BytesIO()
+            
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                for uploaded_file in uploaded_files:
+                    try:
+                        # Read CSV
+                        try:
+                            data = pd.read_csv(uploaded_file, encoding='utf-8')
+                        except:
+                            uploaded_file.seek(0)
+                            data = pd.read_csv(uploaded_file, encoding='latin-1')
+                        
+                        # Generate chart
+                        fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
+                        
+                        # Export based on format
+                        base_filename = os.path.splitext(uploaded_file.name)[0]
+                        
+                        if export_format == 'HTML':
+                            # HTML export
+                            html_str = fig.to_html(include_plotlyjs='cdn')
+                            zip_file.writestr(f"{base_filename}.html", html_str)
+                        
+                        elif export_format == 'SVG':
+                            # SVG export
+                            svg_bytes = fig.to_image(format='svg', width=1200, height=600, scale=2)
+                            zip_file.writestr(f"{base_filename}.svg", svg_bytes)
+                        
+                        elif export_format == 'PDF':
+                            # PDF export
+                            pdf_bytes = fig.to_image(format='pdf', width=1200, height=600, scale=2)
+                            zip_file.writestr(f"{base_filename}.pdf", pdf_bytes)
+                        
+                        else:  # PNG
+                            # PNG export
+                            png_bytes = fig.to_image(format='png', width=1200, height=600, scale=2)
+                            zip_file.writestr(f"{base_filename}.png", png_bytes)
+                        
+                    except Exception as e:
+                        st.warning(f"Skipped {uploaded_file.name}: {str(e)}")
+            
+            # Prepare download
+            zip_buffer.seek(0)
+            
+            st.download_button(
+                label=f"⬇️ Download All Charts as {export_format} (ZIP)",
+                data=zip_buffer,
+                file_name=f"charts_{export_format.lower()}.zip",
+                mime="application/zip",
+                type="primary"
+            )
+            
+            st.success(f"✅ {len(uploaded_files)} charts ready for download!")
+            
+        except Exception as e:
+            st.error(f"Export failed: {str(e)}")
+            st.info("💡 Try using 'Export Single Chart' below for individual downloads")
+
+    # Export single chart
+    st.write("---")
+    st.write("### 📥 Export Individual Charts")
+    
+    for uploaded_file in uploaded_files:
+        try:
+            # Read CSV
+            try:
+                data = pd.read_csv(uploaded_file, encoding='utf-8')
+            except:
+                uploaded_file.seek(0)
+                data = pd.read_csv(uploaded_file, encoding='latin-1')
+            
+            # Generate chart
+            fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
+            
+            # Export based on format
+            base_filename = os.path.splitext(uploaded_file.name)[0]
+            
+            if export_format == 'HTML':
+                html_str = fig.to_html(include_plotlyjs='cdn')
+                file_data = html_str.encode('utf-8')
+                mime_type = 'text/html'
+                file_ext = 'html'
+            elif export_format == 'SVG':
+                file_data = fig.to_image(format='svg', width=1200, height=600, scale=2)
+                mime_type = 'image/svg+xml'
+                file_ext = 'svg'
+            elif export_format == 'PDF':
+                file_data = fig.to_image(format='pdf', width=1200, height=600, scale=2)
+                mime_type = 'application/pdf'
+                file_ext = 'pdf'
+            else:  # PNG
+                file_data = fig.to_image(format='png', width=1200, height=600, scale=2)
+                mime_type = 'image/png'
+                file_ext = 'png'
+            
+            st.download_button(
+                label=f"⬇️ Download {uploaded_file.name} as {export_format}",
+                data=file_data,
+                file_name=f"{base_filename}.{file_ext}",
+                mime=mime_type,
+                key=f"download_{uploaded_file.name}_{export_format}"
+            )
+            
+        except Exception as e:
+            st.error(f"Error exporting {uploaded_file.name}: {str(e)}")
+
+    # Add helpful info
     st.markdown("---")
     st.markdown("""
     ### 📝 How to use:
     1. Upload one or more CSV files
     2. Choose your chart type and color palette
     3. Customize display and style options
-    4. Click **Preview Charts** to see your visualizations
-    5. Use the 📷 **camera icon** in each chart's toolbar to download
+    4. Select export format (PNG, SVG, PDF, or HTML)
+    5. Click **Preview Charts** to see visualizations
+    6. Click **Export All Charts** to download everything as a ZIP
+    7. Or use individual download buttons for single charts
     
-    ### 💡 Tips:
-    - Your CSV should have column headers
-    - First column will be used as X-axis labels
-    - Numeric columns will be plotted
-    - Hover over charts for interactive details
+    ### 💡 Format Guide:
+    - **PNG**: Best for presentations and documents (raster image)
+    - **SVG**: Best for scaling and editing (vector image)
+    - **PDF**: Best for printing and reports
+    - **HTML**: Interactive chart that opens in browser
     """)
