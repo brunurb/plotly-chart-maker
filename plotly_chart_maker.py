@@ -10,7 +10,7 @@ import zipfile
 TRANSLATIONS = {
     'en': {
         'title': '📊 CSV to Chart Converter with Plotly',
-        'subtitle': 'by brunurb',
+        '######': 'by brunurb' ![](https://avatars.githubusercontent.com/u/8878983),
         'upload': 'Choose CSV files',
         'chart_type': 'Choose chart type',
         'color_palette': '🎨 Color Palette Previews',
