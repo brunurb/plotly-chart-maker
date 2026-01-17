@@ -3,202 +3,297 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import os
-import tempfile
-import time
-import base64
 from io import BytesIO
-
-# Set page config for better display
-st.set_page_config(
-    page_title="CSV to Chart Converter",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
+import time
 
 st.title('CSV to Chart Converter with Plotly')
 
+# Use the environment variable if set, otherwise use a default path
+output_dir = os.getenv('OUTPUT_DIR', os.path.join(os.getcwd(), 'output_charts'))
+os.makedirs(output_dir, exist_ok=True)
+print(f"Output directory set to: {output_dir}")
+print(f"Absolute path: {os.path.abspath(output_dir)}")
+
 # File uploader
-uploaded_files = st.file_uploader(
-    "Choose CSV files",
-    type="csv",
-    accept_multiple_files=True,
-    help="Upload one or more CSV files to visualize"
-)
+uploaded_files = st.file_uploader("Choose CSV files", type="csv", accept_multiple_files=True)
 
 if uploaded_files:
-    try:
-        # Chart type selection
-        chart_types = ['Bar', 'Line', 'Scatter', 'Pie']
-        selected_chart_type = st.selectbox('Choose chart type', chart_types)
+    # Chart type selection
+    chart_types = ['Bar', 'Line', 'Scatter', 'Pie', 'Area']
+    selected_chart_type = st.selectbox('Choose chart type', chart_types)
 
-        # Use a fixed set of color palettes
-        color_palette_options = ['Plotly', 'G10', 'T10', 'Alphabet']
-        selected_palette_name = st.selectbox('Choose a color palette', options=color_palette_options)
+    # Color palette options
+    color_palette_options = list(px.colors.qualitative.__dict__.keys())
+    color_palette_options = [name for name in color_palette_options if not name.startswith('_') and isinstance(px.colors.qualitative.__dict__[name], list)]
 
-        # Display options
-        col1, col2 = st.columns(2)
-        with col1:
-            show_x_label = st.checkbox('Show X-axis label', value=True)
-            show_bar_values = st.checkbox('Show bar values', value=True)
-        with col2:
-            show_y_label = st.checkbox('Show Y-axis label', value=True)
-            show_title = st.checkbox('Show Title', value=True)
+    # Create a dictionary to map palette names to their colors
+    palette_colors = {name: px.colors.qualitative.__dict__[name] for name in color_palette_options}
 
-        # Background and text options
-        text_color = st.radio('Text color', ['Black', 'White'])
-        bg_color = st.radio('Background color', ['White', 'Black'])
+    # Display palette previews in a vertical list
+    st.write("### Color Palette Previews")
 
-        def get_fig(data, chart_type, palette_name):
-            # Get colors from the selected palette
-            if palette_name == 'Plotly':
-                colors = px.colors.qualitative.Plotly
-            elif palette_name == 'G10':
-                colors = px.colors.qualitative.G10
-            elif palette_name == 'T10':
-                colors = px.colors.qualitative.T10
-            else:  # Alphabet
-                colors = px.colors.qualitative.Alphabet
+    # Use a selectbox for palette selection
+    selected_palette_name = st.selectbox('Choose a color palette', options=color_palette_options)
 
-            # Determine text color based on background
-            effective_text_color = 'white' if bg_color == 'Black' else 'black'
+    # Display the selected palette preview
+    if selected_palette_name:
+        colors = palette_colors[selected_palette_name]
+        color_swatches = ''.join([f'<div style="display: inline-block; width: 12px; height: 12px; margin-right: 2px; background-color: {color}; border: 1px solid #ddd;"></div>' for color in colors])
+        st.markdown(f"""
+        <div style="display: flex; align-items: center; margin-bottom: 10px;">
+            <span style="margin-right: 10px;">{selected_palette_name}</span>
+            <div style="display: flex;">{color_swatches}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-            # Create figure
-            fig = go.Figure()
+    # Show all palettes in an expander
+    with st.expander("View All Palettes", expanded=False):
+        for name in color_palette_options:
+            colors = palette_colors[name]
+            color_swatches = ''.join([f'<div style="display: inline-block; width: 12px; height: 12px; margin-right: 2px; background-color: {color}; border: 1px solid #ddd;"></div>' for color in colors])
+            st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                <span style="margin-right: 10px; width: 150px;">{name}</span>
+                <div style="display: flex;">{color_swatches}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
-            # Check if required columns exist
-            if 'concelhos' not in data.columns:
-                st.warning("Column 'concelhos' not found. Using first column as x-axis.")
-                data = data.rename(columns={data.columns[0]: 'concelhos'})
+    # Legend positioning options
+    legend_positions = ['top right', 'top left', 'bottom left', 'bottom right']
+    selected_legend_position = st.selectbox('Choose legend position', options=legend_positions)
 
-            # Get data columns (skip the first column which we assume is x-axis)
-            data_columns = [col for col in data.columns if col != 'concelhos']
+    # Text visibility options
+    show_x_label = st.checkbox('Show X-axis label', value=True)
+    show_y_label = st.checkbox('Show Y-axis label', value=True)
+    show_title = st.checkbox('Show Title', value=True)
 
-            if chart_type == 'Bar':
-                for i, col in enumerate(data_columns[:3]):  # Limit to first 3 data columns
-                    fig.add_trace(go.Bar(
-                        x=data['concelhos'],
-                        y=data[col],
-                        name=col,
-                        marker_color=colors[i % len(colors)],
-                        text=data[col] if show_bar_values else None,
-                        textposition='outside' if show_bar_values else None,
-                        textfont=dict(color=effective_text_color)
-                    ))
-                fig.update_layout(barmode='group')
+    # New options for bar values and background
+    show_bar_values = st.checkbox('Show bar values', value=True)
+    text_color = st.radio('Text color', ['Black', 'White'])
+    bg_color = st.radio('Background color', ['White', 'Black', 'Transparent'])
 
-            elif chart_type == 'Line':
-                for i, col in enumerate(data_columns[:3]):  # Limit to first 3 data columns
-                    fig.add_trace(go.Scatter(
-                        x=data['concelhos'],
-                        y=data[col],
-                        name=col,
-                        mode='lines+markers',
-                        line=dict(color=colors[i % len(colors)]),
-                        text=data[col] if show_bar_values else None,
-                        textposition='top center' if show_bar_values else None,
-                        textfont=dict(color=effective_text_color)
-                    ))
+    # Export options
+    export_format = st.selectbox('Export format', ['PNG', 'JPEG', 'SVG', 'PDF'])
 
-            elif chart_type == 'Scatter':
-                for i, col in enumerate(data_columns[:3]):  # Limit to first 3 data columns
-                    fig.add_trace(go.Scatter(
-                        x=data['concelhos'],
-                        y=data[col],
-                        name=col,
-                        mode='markers',
-                        marker=dict(color=colors[i % len(colors)]),
-                        text=data[col] if show_bar_values else None,
-                        textposition='top center' if show_bar_values else None,
-                        textfont=dict(color=effective_text_color)
-                    ))
+    def get_fig(data, chart_type, palette_name, filename=None):
+        colors = px.colors.qualitative.__dict__[palette_name]
 
-            elif chart_type == 'Pie':
-                if len(data_columns) > 0:
-                    fig.add_trace(go.Pie(
-                        labels=data_columns[:3],  # Limit to first 3 data columns
-                        values=data.iloc[0, 1:4],  # First row, first 3 data columns
-                        marker=dict(colors=colors[:3]),
-                        textinfo='label+percent' if show_bar_values else 'label',
-                        textfont=dict(color=effective_text_color)
-                    ))
+        # Determine text color based on background
+        if bg_color == 'White':
+            effective_text_color = 'black'
+        elif bg_color == 'Black':
+            effective_text_color = 'white'
+        else:  # Transparent
+            effective_text_color = text_color.lower()
 
-            # Set background and layout
+        # Create figure with explicit height
+        fig = go.Figure()
+
+        if chart_type == 'Bar':
+            for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
+                fig.add_trace(go.Bar(
+                    x=data['concelhos'],
+                    y=data[col],
+                    name=col,
+                    marker_color=colors[i % len(colors)],
+                    text=data[col] if show_bar_values else None,
+                    textposition='outside' if show_bar_values else None,
+                    textfont=dict(color=effective_text_color)
+                ))
+            fig.update_layout(barmode='group')
+
+        elif chart_type == 'Line':
+            for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
+                fig.add_trace(go.Scatter(
+                    x=data['concelhos'],
+                    y=data[col],
+                    name=col,
+                    mode='lines+markers',
+                    line=dict(color=colors[i % len(colors)]),
+                    text=data[col] if show_bar_values else None,
+                    textposition='top center' if show_bar_values else None,
+                    textfont=dict(color=effective_text_color)
+                ))
+
+        elif chart_type == 'Scatter':
+            for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
+                fig.add_trace(go.Scatter(
+                    x=data['concelhos'],
+                    y=data[col],
+                    name=col,
+                    mode='markers',
+                    marker=dict(color=colors[i % len(colors)]),
+                    text=data[col] if show_bar_values else None,
+                    textposition='top center' if show_bar_values else None,
+                    textfont=dict(color=effective_text_color)
+                ))
+
+        elif chart_type == 'Pie':
+            fig.add_trace(go.Pie(
+                labels=data.columns[1:],
+                values=data.iloc[0, 1:],
+                marker=dict(colors=colors[:len(data.columns[1:])]),
+                textinfo='label+percent' if show_bar_values else 'label',
+                textfont=dict(color=effective_text_color)
+            ))
+
+        elif chart_type == 'Area':
+            for i, col in enumerate(['Sim', 'Não', 'Ns/Nr']):
+                fig.add_trace(go.Scatter(
+                    x=data['concelhos'],
+                    y=data[col],
+                    name=col,
+                    stackgroup='one',
+                    fillcolor=colors[i % len(colors)],
+                    line=dict(color=colors[i % len(colors)])
+                ))
+
+        # Set background color and text color with soft gray grid lines
+        if bg_color == 'White':
             fig.update_layout(
-                paper_bgcolor='black' if bg_color == 'Black' else 'white',
-                plot_bgcolor='black' if bg_color == 'Black' else 'white',
-                font=dict(color=effective_text_color),
+                paper_bgcolor='white',
+                plot_bgcolor='white',
+                font=dict(color='black'),
                 xaxis=dict(
-                    title=dict(text='Concelhos' if show_x_label else '', font=dict(color=effective_text_color)),
-                    tickfont=dict(color=effective_text_color),
-                    gridcolor='rgba(200, 200, 200, 0.3)' if bg_color == 'White' else 'rgba(100, 100, 100, 0.5)',
+                    title=dict(font=dict(color='black')),
+                    tickfont=dict(color='black'),
+                    gridcolor='rgba(200, 200, 200, 0.3)',
                     showgrid=True,
+                    range=[-0.5, len(data['concelhos'])-0.5]
                 ),
                 yaxis=dict(
-                    title=dict(text='Percentage' if show_y_label else '', font=dict(color=effective_text_color)),
-                    tickfont=dict(color=effective_text_color),
-                    gridcolor='rgba(200, 200, 200, 0.3)' if bg_color == 'White' else 'rgba(100, 100, 100, 0.5)',
+                    title=dict(font=dict(color='black')),
+                    tickfont=dict(color='black'),
+                    gridcolor='rgba(200, 200, 200, 0.3)',
                     showgrid=True,
+                    autorange=True
                 ),
-                legend=dict(
-                    font=dict(color=effective_text_color),
-                    orientation="h",
-                    yanchor="bottom",
-                    y=-0.3,
-                    xanchor="right",
-                    x=1
-                ),
-                margin=dict(l=50, r=50, b=80, t=100, pad=10),
+                legend=dict(font=dict(color='black')),
+                margin=dict(l=60, r=60, b=80, t=100, pad=10),
                 height=600,
-                title_text='Responses by Concelhos' if show_title else '',
+                autosize=False
+            )
+        elif bg_color == 'Black':
+            fig.update_layout(
+                paper_bgcolor='black',
+                plot_bgcolor='black',
+                font=dict(color='white'),
+                xaxis=dict(
+                    title=dict(font=dict(color='white')),
+                    tickfont=dict(color='white'),
+                    gridcolor='rgba(100, 100, 100, 0.5)',
+                    showgrid=True,
+                    range=[-0.5, len(data['concelhos'])-0.5]
+                ),
+                yaxis=dict(
+                    title=dict(font=dict(color='white')),
+                    tickfont=dict(color='white'),
+                    gridcolor='rgba(100, 100, 100, 0.5)',
+                    showgrid=True,
+                    autorange=True
+                ),
+                legend=dict(font=dict(color='white')),
+                margin=dict(l=60, r=60, b=80, t=100, pad=10),
+                height=600,
+                autosize=False
+            )
+        else:  # Transparent
+            fig.update_layout(
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
+                font=dict(color=effective_text_color),
+                xaxis=dict(
+                    title=dict(font=dict(color=effective_text_color)),
+                    tickfont=dict(color=effective_text_color),
+                    gridcolor='rgba(200, 200, 200, 0.3)',
+                    showgrid=True,
+                    range=[-0.5, len(data['concelhos'])-0.5]
+                ),
+                yaxis=dict(
+                    title=dict(font=dict(color=effective_text_color)),
+                    tickfont=dict(color=effective_text_color),
+                    gridcolor='rgba(200, 200, 200, 0.3)',
+                    showgrid=True,
+                    autorange=True
+                ),
+                legend=dict(font=dict(color=effective_text_color)),
+                margin=dict(l=60, r=60, b=80, t=100, pad=10),
+                height=600,
+                autosize=False
             )
 
-            return fig
+        fig.update_layout(
+            legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="right", x=1),
+            title_text=f'Responses by Concelhos - {os.path.splitext(filename)[0]}' if filename and show_title else ('Responses by Concelhos' if show_title else ''),
+            xaxis_title='Concelhos' if show_x_label else '',
+            yaxis_title='Percentage' if show_y_label else '',
+            legend_title_text='',
+            legend_traceorder="normal"
+        )
+        return fig
 
-        if st.button('Preview Charts'):
-            for uploaded_file in uploaded_files:
-                try:
-                    with st.spinner(f'Processing {uploaded_file.name}...'):
-                        # Read CSV file
-                        try:
-                            data = pd.read_csv(uploaded_file)
-                        except Exception as e:
-                            st.error(f"Error reading {uploaded_file.name}: {str(e)}")
-                            continue
+    if st.button('Preview Charts'):
+        for uploaded_file in uploaded_files:
+            data = pd.read_csv(uploaded_file)
+            st.write(f"Data Preview for {uploaded_file.name}:", data.head())
 
-                        # Show data preview
-                        with st.expander(f"Data Preview: {uploaded_file.name}"):
-                            st.dataframe(data.head())
+            fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
+            st.plotly_chart(fig, use_container_width=True, key=f"chart_{uploaded_file.name}")
 
-                        # Generate and display chart
-                        fig = get_fig(data, selected_chart_type, selected_palette_name)
-                        if fig:
-                            st.plotly_chart(fig, use_container_width=True, key=f"chart_{uploaded_file.name}")
-                except Exception as e:
-                    st.error(f"Error processing {uploaded_file.name}: {str(e)}")
+    if st.button('Export Current Chart'):
+        for uploaded_file in uploaded_files:
+            data = pd.read_csv(uploaded_file)
+            fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
 
-        # Export functionality - simplified to avoid memory issues
-        if st.button('Export Current Chart'):
-            for uploaded_file in uploaded_files:
-                try:
-                    with st.spinner(f'Exporting {uploaded_file.name}...'):
-                        data = pd.read_csv(uploaded_file)
-                        fig = get_fig(data, selected_chart_type, selected_palette_name)
+            img_data = fig.to_image(format=export_format.lower())
 
-                        if fig:
-                            # Create a download link for the chart
-                            img_bytes = fig.to_image(format="png")
+            st.download_button(
+                label=f"Download Chart as {export_format}",
+                data=img_data,
+                file_name=f"chart_{os.path.splitext(uploaded_file.name)[0]}.{export_format.lower()}",
+                mime=f"image/{export_format.lower()}",
+                key=f"download_button_{uploaded_file.name}"
+            )
 
-                            # Create download button
-                            st.download_button(
-                                label=f"Download {uploaded_file.name} as PNG",
-                                data=img_bytes,
-                                file_name=f"chart_{os.path.splitext(uploaded_file.name)[0]}.png",
-                                mime="image/png",
-                                key=f"download_{uploaded_file.name}"
-                            )
-                except Exception as e:
-                    st.error(f"Error exporting {uploaded_file.name}: {str(e)}")
+    if st.button('Export All Charts to Folder'):
+        progress_bar = st.progress(0)
+        status_text = st.empty()
 
-    except Exception as e:
-        st.error(f"An unexpected error occurred: {str(e)}")
+        try:
+            total_files = len(uploaded_files)
+            for i, uploaded_file in enumerate(uploaded_files):
+                # Update progress
+                progress = (i + 1) / total_files
+                progress_bar.progress(progress)
+                status_text.text(f"Processing file {i+1} of {total_files}: {uploaded_file.name}")
+
+                data = pd.read_csv(uploaded_file)
+                fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
+
+                # Save the chart
+                output_path = os.path.join(output_dir, f"chart_{os.path.splitext(uploaded_file.name)[0]}.{export_format.lower()}")
+                print(f"Attempting to save to: {output_path}")
+                print(f"Directory exists: {os.path.exists(output_dir)}")
+                print(f"Directory writable: {os.access(output_dir, os.W_OK)}")
+
+                fig.write_image(output_path, format=export_format.lower())
+                print(f"File saved: {os.path.exists(output_path)}")
+
+                # Small delay to allow the file to be written
+                time.sleep(0.1)
+
+            status_text.text(f"Todos os {total_files} gráficos foram guardados na pasta '{os.path.basename(output_dir)}'.")
+            st.success(f"Exportação concluída com sucesso! Ficheiros guardados em: {os.path.abspath(output_dir)}")
+
+        except Exception as e:
+            status_text.text(f"Ocorreu um erro: {str(e)}")
+            st.error(f"Falha na exportação: {str(e)}")
+            import traceback
+            print(traceback.format_exc())
+
+        finally:
+            # Remove progress bar after completion
+            time.sleep(2)
+            progress_bar.empty()
+            status_text.empty()
 
