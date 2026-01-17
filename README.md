@@ -8,4 +8,4 @@ Online tool to create beautiful charts from CSV files.
 - Export as PNG, JPEG, SVG, PDF
 - Batch processing
 
-[Try it live! https://plotly-chart-maker-bbb.streamlit.app/](https://plotly-chart-maker-bbb.streamlit.app/)
+[https://plotly-chart-maker-bbb.streamlit.app/](https://plotly-chart-maker-bbb.streamlit.app/)
