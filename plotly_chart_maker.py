@@ -144,19 +144,22 @@ with st.sidebar:
 # Get translations
 t = TRANSLATIONS[language]
 
-# --- Title with avatar/credit ---
+# --- Title with avatar/credit below and right ---
 st.markdown(
     f"""
-    <div style="position: relative; display: inline-block;">
-        <h1 style="margin: 0; line-height: 1.2;">{t['title']}</h1>
-        <div style="position: absolute; top: 0.2em; left: -0.4em; display: flex; align-items: center; gap: 4px;">
-            <img src="https://avatars.githubusercontent.com/u/8878983?s=32" width="20" height="20" style="border-radius:50%;">
-            <span style="font-size: 0.8em; color: #666;">by brunurb</span>
+    <div style="display: flex; flex-direction: column; align-items: flex-start;">
+        <h1 style="margin: 0;">{t['title']}</h1>
+        <div style="display: flex; justify-content: flex-end; align-items: center; margin-top: 4px;">
+            <span style="font-size: 0.9em; color: #666; margin-right: 6px;">by brunurb</span>
+            <a href="https://brunurb.github.io/" target="_blank">
+                <img src="https://avatars.githubusercontent.com/u/8878983?s=32" width="24" height="24" style="border-radius:50%;">
+            </a>
         </div>
     </div>
     """,
     unsafe_allow_html=True
 )
+
 
 # --- File uploader ---
 uploaded_files = st.file_uploader(t['upload'], type="csv", accept_multiple_files=True)
