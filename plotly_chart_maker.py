@@ -11,7 +11,7 @@ TRANSLATIONS = {
     'en': {
         'title': '📊 CSV to Chart Converter with Plotly',
         '######': 'by brunurb',
-        ![](https://avatars.githubusercontent.com/u/8878983),
+        ![brunurb](https://avatars.githubusercontent.com/u/8878983 "brunurb")
         'upload': 'Choose CSV files',
         'chart_type': 'Choose chart type',
         'color_palette': '🎨 Color Palette Previews',
