@@ -147,6 +147,17 @@ t = TRANSLATIONS[language]
 
 st.title(t['title'])
 
+st.markdown(
+    f"""
+    <div style="text-align: left; margin-top: -15px; display: inline-flex; align-items: center; gap: 6px;">
+        <img src="https://avatars.githubusercontent.com/u/8878983?s=32" width="20" height="20" style="border-radius:50%;">
+        <span style="font-size: 0.8em; color: #666;">by brunurb</span>
+    </div>
+    """,
+    unsafe_allow_html=True
+)
+
+
 # File uploader
 uploaded_files = st.file_uploader(t['upload'], type="csv", accept_multiple_files=True)
 
