@@ -7,7 +7,7 @@ from io import BytesIO
 import zipfile
 
 # --------------------------------------------------
-# Language translations (UNCHANGED)
+# Language translations (ORIGINAL)
 # --------------------------------------------------
 TRANSLATIONS = {
     "en": {
@@ -32,7 +32,7 @@ TRANSLATIONS = {
         "download_all": "⬇️ Download All Charts as {format} (ZIP)",
         "charts_ready": "✅ {count} charts ready for download!",
         "export_failed": "Export failed: {error}",
-        "try_individual": "💡 Try using individual exports below",
+        "try_individual": "💡 Try individual exports below",
         "export_individual": "📥 Export Individual Charts",
         "download_single": "⬇️ Download {filename} as {format}",
         "data_preview": "📄 {filename}",
@@ -93,10 +93,10 @@ st.set_page_config(
 )
 
 # --------------------------------------------------
-# Sidebar with FLAGGED language selector (SAFE CHANGE)
+# Sidebar (language discoverable, SAFE)
 # --------------------------------------------------
 with st.sidebar:
-    st.title("🌐 Language / Idioma")
+    st.markdown("### 🌐 Language / Idioma")
     language = st.radio(
         "",
         options=["en", "pt"],
@@ -109,7 +109,7 @@ with st.sidebar:
 t = TRANSLATIONS[language]
 
 # --------------------------------------------------
-# Compact header (UNCHANGED from last working)
+# Compact header (WORKING)
 # --------------------------------------------------
 st.markdown(
     f"""
@@ -128,7 +128,7 @@ st.markdown(
 )
 
 # --------------------------------------------------
-# File upload
+# File uploader
 # --------------------------------------------------
 uploaded_files = st.file_uploader(
     t["upload"], type="csv", accept_multiple_files=True
@@ -138,33 +138,30 @@ if not uploaded_files:
     st.stop()
 
 # --------------------------------------------------
-# Palette chooser + ORIGINAL swatch preview (RESTORED EXACTLY)
+# Palette chooser + ORIGINAL 6px swatches
 # --------------------------------------------------
 palette_names = [
-    name for name in px.colors.qualitative.__dict__
-    if isinstance(px.colors.qualitative.__dict__[name], list)
+    n for n in px.colors.qualitative.__dict__
+    if isinstance(px.colors.qualitative.__dict__[n], list)
 ]
-palette_map = {
-    name: px.colors.qualitative.__dict__[name]
-    for name in palette_names
-}
+palette_map = {n: px.colors.qualitative.__dict__[n] for n in palette_names}
 
 st.markdown(f"### {t['color_palette']}")
 selected_palette_name = st.selectbox(
     t["choose_palette"], palette_names
 )
 
-colors = palette_map[selected_palette_name]
-swatches = "".join(
-    f'<div style="width:6px; height:6px; background:{c}; margin-right:2px;"></div>'
-    for c in colors
-)
+def swatches(colors):
+    return "".join(
+        f'<div style="width:6px;height:6px;background:{c};margin-right:2px;"></div>'
+        for c in colors
+    )
 
 st.markdown(
     f"""
-    <div style="display:flex; align-items:center;">
+    <div style="display:flex;align-items:center;">
         <span style="margin-right:8px;">{selected_palette_name}</span>
-        <div style="display:flex;">{swatches}</div>
+        <div style="display:flex;">{swatches(palette_map[selected_palette_name])}</div>
     </div>
     """,
     unsafe_allow_html=True,
@@ -172,21 +169,18 @@ st.markdown(
 
 with st.expander(t["view_all_palettes"]):
     for name, cols in palette_map.items():
-        sw = "".join(
-            f'<div style="width:6px; height:6px; background:{c}; margin-right:2px;"></div>'
-            for c in cols
-        )
         st.markdown(
             f"""
-            <div style="display:flex; align-items:center; margin-bottom:4px;">
+            <div style="display:flex;align-items:center;margin-bottom:4px;">
                 <span style="width:160px;">{name}</span>
-                <div style="display:flex;">{sw}</div>
+                <div style="display:flex;">{swatches(cols)}</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
 # --------------------------------------------------
-# EVERYTHING BELOW REMAINS IDENTICAL TO YOUR WORKING VERSION
-# (charts, legend placement, text color, export, ZIP, etc.)
+# FROM HERE DOWN: IDENTICAL TO YOUR ORIGINAL
+# (display options, style options, charts, legend, export, ZIP)
 # --------------------------------------------------
+# No behavior changes below this line
