@@ -6,9 +6,7 @@ import os
 from io import BytesIO
 import zipfile
 
-# --------------------------
-# Translations
-# --------------------------
+# --- Language translations ---
 TRANSLATIONS = {
     'en': {
         'title': '📊 CSV to Chart Converter with Plotly',
@@ -25,7 +23,7 @@ TRANSLATIONS = {
         'style_options': '🎨 Style Options',
         'text_color': 'Text color',
         'bg_color': 'Background color',
-        'legend_position': 'Legend position',
+        'legend_position': 'Legend Position',
         'export_options': '💾 Export Options',
         'export_format': 'Export format',
         'preview_charts': '🔍 Preview Charts',
@@ -77,7 +75,7 @@ TRANSLATIONS = {
         'style_options': '🎨 Opções de Estilo',
         'text_color': 'Cor do texto',
         'bg_color': 'Cor de fundo',
-        'legend_position': 'Posição da legenda',
+        'legend_position': 'Posição da Legenda',
         'export_options': '💾 Opções de Exportação',
         'export_format': 'Formato de exportação',
         'preview_charts': '🔍 Pré-visualizar Gráficos',
@@ -116,99 +114,120 @@ TRANSLATIONS = {
     }
 }
 
-# Chart types
-CHART_TYPES = {'en': ['Bar', 'Line', 'Scatter', 'Pie', 'Area'], 'pt': ['Barras', 'Linha', 'Dispersão', 'Circular', 'Área']}
-CHART_TYPE_MAP = {'Barras':'Bar','Linha':'Line','Dispersão':'Scatter','Circular':'Pie','Área':'Area'}
+# --- Chart types ---
+CHART_TYPES = {
+    'en': ['Bar', 'Line', 'Scatter', 'Pie', 'Area'],
+    'pt': ['Barras', 'Linha', 'Dispersão', 'Circular', 'Área']
+}
 
-# --------------------------
-# Page config
-# --------------------------
+CHART_TYPE_MAP = {
+    'Barras': 'Bar', 'Linha': 'Line', 'Dispersão': 'Scatter', 'Circular': 'Pie', 'Área': 'Area'
+}
+
+# --- Page config ---
 st.set_page_config(page_title="ChartMaker", page_icon="📊", layout="wide")
 
-# --------------------------
-# Sidebar: language
-# --------------------------
+# --- Sidebar with collapsible language selector ---
 with st.sidebar:
     st.markdown("## 🌐 Language / Idioma")
-    language = st.radio("", options=['en','pt'], index=0,
-                        format_func=lambda x: '🇬🇧 English' if x=='en' else '🇵🇹 Português')
+    language = st.radio(
+        "",
+        options=['en','pt'],
+        format_func=lambda x: "🇬🇧 English" if x=='en' else "🇵🇹 Português",
+        index=0
+    )
     st.markdown("---")
-    st.markdown("### ChartMaker v1.0")
+    st.markdown("### ChartMaker")
+    st.markdown("v1.0")
 
 t = TRANSLATIONS[language]
 
-# --------------------------
-# Header with compact credits
-# --------------------------
+# --- Header with avatar on the right ---
 st.markdown(
     f"""
-    <div style="display: flex; justify-content: space-between; align-items: flex-end;">
-        <h1 style="margin:0; font-size:28px;">{t['title']}</h1>
-        <a href="https://brunurb.github.io/" target="_blank" style="display:flex; align-items:center; gap:4px; font-size:0.9em; text-decoration:none; color:#666;">
-            <img src="https://avatars.githubusercontent.com/u/8878983?s=32" width="20" height="20" style="border-radius:50%;">
-            by brunurb
+    <div style="display: flex; align-items: center; justify-content: space-between;">
+        <h1 style="margin:0;font-size:2rem;">{t['title']}</h1>
+        <a href="https://brunurb.github.io/" target="_blank" style="text-decoration:none; display:flex; align-items:center; gap:5px;">
+            <img src="https://avatars.githubusercontent.com/u/8878983?s=32" width="32" height="32" style="border-radius:50%;">
+            <span style="color:#666; font-size:0.9rem;">by brunurb</span>
         </a>
     </div>
     """,
     unsafe_allow_html=True
 )
 
-# --------------------------
-# File uploader
-# --------------------------
-uploaded_files = st.file_uploader(t['upload'], type='csv', accept_multiple_files=True)
+# --- File uploader ---
+uploaded_files = st.file_uploader(t['upload'], type="csv", accept_multiple_files=True)
 
-# --------------------------
-# Chart options (shown when file uploaded)
-# --------------------------
+# --- Chart options ---
 if uploaded_files:
-    # Chart type
+
     chart_types_display = CHART_TYPES[language]
     selected_chart_type_display = st.selectbox(t['chart_type'], chart_types_display)
     selected_chart_type = CHART_TYPE_MAP.get(selected_chart_type_display, selected_chart_type_display) if language=='pt' else selected_chart_type_display
 
-    # Color palette
-    color_palette_options = [name for name in dir(px.colors.qualitative) if not name.startswith('_') and isinstance(getattr(px.colors.qualitative,name), list)]
-    palette_colors = {name: getattr(px.colors.qualitative,name) for name in color_palette_options}
+    # --- Color palettes ---
+    color_palette_options = [name for name in px.colors.qualitative.__dict__.keys() if not name.startswith('_') and isinstance(px.colors.qualitative.__dict__[name], list)]
+    palette_colors = {name: px.colors.qualitative.__dict__[name] for name in color_palette_options}
+
     st.write(f"### {t['color_palette']}")
-    selected_palette_name = st.selectbox(t['choose_palette'], options=color_palette_options)
+    selected_palette_name = st.selectbox(t['choose_palette'], color_palette_options)
     if selected_palette_name:
         colors = palette_colors[selected_palette_name]
-        swatches = ''.join([f'<div style="display:inline-block;width:6px;height:6px;margin-right:1px;background-color:{c};border:1px solid #ddd"></div>' for c in colors])
-        st.markdown(f'<div style="display:flex;align-items:center;margin-bottom:8px;"><span style="margin-right:4px">{selected_palette_name}</span>{swatches}</div>', unsafe_allow_html=True)
-    
-    # Display options
-    col1,col2 = st.columns(2)
+        color_swatches = ''.join([
+            f'<div style="display:inline-block;width:12px;height:12px;margin-right:2px;background-color:{color};border:1px solid #ddd;"></div>'
+            for color in colors
+        ])
+        st.markdown(f"""
+            <div style="display:flex;align-items:center;margin-bottom:10px;">
+                <span style="margin-right:10px;">{selected_palette_name}</span>
+                <div style="display:flex;">{color_swatches}</div>
+            </div>
+        """, unsafe_allow_html=True)
+
+    with st.expander(t['view_all_palettes'], expanded=False):
+        for name in color_palette_options:
+            colors = palette_colors[name]
+            color_swatches = ''.join([
+                f'<div style="display:inline-block;width:12px;height:12px;margin-right:2px;background-color:{color};border:1px solid #ddd;"></div>'
+                for color in colors
+            ])
+            st.markdown(f"""
+                <div style="display:flex;align-items:center;margin-bottom:5px;">
+                    <span style="margin-right:10px;width:150px;">{name}</span>
+                    <div style="display:flex;">{color_swatches}</div>
+                </div>
+            """, unsafe_allow_html=True)
+
+    # --- Display & style options ---
+    col1, col2 = st.columns(2)
     with col1:
         st.write(f"### {t['display_options']}")
         show_x_label = st.checkbox(t['show_x_label'], value=True)
         show_y_label = st.checkbox(t['show_y_label'], value=True)
         show_title = st.checkbox(t['show_title'], value=True)
         show_bar_values = st.checkbox(t['show_values'], value=True)
-        legend_choice = st.selectbox(t['legend_position'], ['Right Top','Right Center','Right Bottom','Bottom Left','Bottom Center','Bottom Right'])
     with col2:
         st.write(f"### {t['style_options']}")
-        text_color_display = st.radio(t['text_color'], [t['black'],t['white']])
+        text_color_display = st.radio(t['text_color'], [t['black'], t['white']])
         text_color = 'Black' if text_color_display==t['black'] else 'White'
-        bg_color_display = st.radio(t['bg_color'], [t['white'],t['black'],t['transparent']])
-        if bg_color_display==t['white']: bg_color='White'
-        elif bg_color_display==t['black']: bg_color='Black'
-        else: bg_color='Transparent'
+        bg_color_display = st.radio(t['bg_color'], [t['white'], t['black'], t['transparent']])
+        bg_color = 'White' if bg_color_display==t['white'] else 'Black' if bg_color_display==t['black'] else 'Transparent'
+        legend_choice = st.selectbox(t['legend_position'], [
+            'Right Top','Right Center','Right Bottom',
+            'Bottom Left','Bottom Center','Bottom Right'
+        ])
 
-    # Export format
-    st.write(f"### {t['export_options']}")
     export_format = st.selectbox(t['export_format'], ['PNG','SVG','PDF','HTML'])
 
-    # --------------------------
-    # Chart generation function
-    # --------------------------
+    # --- Figure generation function ---
     def get_fig(data, chart_type, palette_name, filename=None):
-        colors = palette_colors[palette_name]
+        colors = px.colors.qualitative.__dict__[palette_name]
         effective_text_color = 'black' if text_color=='Black' else 'white'
-
         fig = go.Figure()
-        data_columns = [c for c in ['Sim','Não','Ns/Nr'] if c in data.columns]
-        if not data_columns: data_columns = data.select_dtypes(include=['number']).columns.tolist()
+        data_columns = [col for col in ['Sim','Não','Ns/Nr'] if col in data.columns]
+        if not data_columns:
+            data_columns = data.select_dtypes(include=['number']).columns.tolist()
 
         if chart_type=='Bar':
             for i,col in enumerate(data_columns):
@@ -265,38 +284,39 @@ if uploaded_files:
                     line=dict(color=colors[i%len(colors)])
                 ))
 
-        # --------------------------
-        # Layout
-        # --------------------------
-        fig_height = 600
         layout_config = dict(
-            title_text=t['chart_title'].format(name=os.path.splitext(filename)[0]) if filename and show_title else (t['chart_title_default'] if show_title else ''),
-            title_font=dict(color=effective_text_color),
+            title=dict(
+                text=t['chart_title'].format(name=os.path.splitext(filename)[0]) if filename and show_title else (t['chart_title_default'] if show_title else ''),
+                font=dict(color=effective_text_color)
+            ),
+            xaxis=dict(
+                title=dict(text=data.columns[0] if show_x_label else '', font=dict(color=effective_text_color)),
+                tickfont=dict(color=effective_text_color),
+                gridcolor='rgba(200,200,200,0.3)',
+                showgrid=True
+            ),
+            yaxis=dict(
+                title=dict(text=t['y_axis'] if show_y_label else '', font=dict(color=effective_text_color)),
+                tickfont=dict(color=effective_text_color),
+                gridcolor='rgba(200,200,200,0.3)',
+                showgrid=True
+            ),
+            legend=dict(font=dict(color=effective_text_color)),
             paper_bgcolor='white' if bg_color=='White' else 'black' if bg_color=='Black' else 'rgba(0,0,0,0)',
             plot_bgcolor='white' if bg_color=='White' else 'black' if bg_color=='Black' else 'rgba(0,0,0,0)',
-            font=dict(color=effective_text_color),
-            xaxis=dict(title=dict(text=data.columns[0] if show_x_label else '', font=dict(color=effective_text_color)),
-                       tickfont=dict(color=effective_text_color),
-                       gridcolor='rgba(200,200,200,0.3)',
-                       showgrid=True),
-            yaxis=dict(title=dict(text=t['y_axis'] if show_y_label else '', font=dict(color=effective_text_color)),
-                       tickfont=dict(color=effective_text_color),
-                       gridcolor='rgba(200,200,200,0.3)',
-                       showgrid=True),
-            margin=dict(l=60, r=60, t=100, b=80),
-            height=fig_height,
+            margin=dict(l=60,r=60,t=100,b=80),
+            height=600,
             width=1200,
             autosize=False
         )
 
-        # --------------------------
         # Legend placement outside
-        # --------------------------
         right_opts = ['Right Top','Right Center','Right Bottom']
         bottom_opts = ['Bottom Left','Bottom Center','Bottom Right']
+
         if legend_choice in right_opts:
             y_pos = 1 if legend_choice.endswith('Top') else 0.5 if legend_choice.endswith('Center') else 0
-            layout_config['legend'] = dict(
+            layout_config['legend'].update(
                 orientation='v',
                 x=1.02,
                 xanchor='left',
@@ -307,7 +327,7 @@ if uploaded_files:
             layout_config['margin']['r'] = 150
         elif legend_choice in bottom_opts:
             x_pos = 0 if legend_choice.endswith('Left') else 0.5 if legend_choice.endswith('Center') else 1
-            layout_config['legend'] = dict(
+            layout_config['legend'].update(
                 orientation='h',
                 x=x_pos,
                 xanchor='left' if legend_choice.endswith('Left') else 'center' if legend_choice.endswith('Center') else 'right',
@@ -316,26 +336,37 @@ if uploaded_files:
                 font=dict(color=effective_text_color)
             )
             layout_config['margin']['b'] = 120
-            layout_config['height'] += 50  # extra space for bottom legend
+            layout_config['height'] += 50
 
         fig.update_layout(**layout_config)
         return fig
 
-    # --------------------------
-    # Preview charts
-    # --------------------------
-    if st.button(t['preview_charts']):
-        for uploaded_file in uploaded_files:
+# --- Preview button ---
+if st.button(t['preview_charts'], type="primary"):
+    for uploaded_file in uploaded_files:
+        try:
             try:
-                try: data = pd.read_csv(uploaded_file, encoding='utf-8')
-                except: uploaded_file.seek(0); data = pd.read_csv(uploaded_file, encoding='latin-1')
-                st.write(f"### {t['data_preview'].format(filename=uploaded_file.name)}")
-                with st.expander(t['view_data']): st.dataframe(data.head())
-                fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
-                st.plotly_chart(fig, use_container_width=True, key=f"chart_{uploaded_file.name}")
-            except Exception as e:
-                st.error(t['error_processing'].format(filename=uploaded_file.name,error=str(e)))
+                data = pd.read_csv(uploaded_file, encoding='utf-8')
+            except:
+                uploaded_file.seek(0)
+                data = pd.read_csv(uploaded_file, encoding='latin-1')
+            st.write(f"### {t['data_preview'].format(filename=uploaded_file.name)}")
+            with st.expander(t['view_data']):
+                st.dataframe(data.head())
+            fig = get_fig(data, selected_chart_type, selected_palette_name, uploaded_file.name)
+            st.plotly_chart(fig, use_container_width=True, key=f"chart_{uploaded_file.name}")
+        except Exception as e:
+            st.error(t['error_processing'].format(filename=uploaded_file.name,error=str(e)))
 
-# --------------------------
-# The rest (Export all / Export single) remains identical to your original working code
-# --------------------------
+# --- Export All Charts ---
+if st.button(t['export_all'], type="secondary"):
+    try:
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer,'w',zipfile.ZIP_DEFLATED) as zip_file:
+            for uploaded_file in uploaded_files:
+                try:
+                    try:
+                        data = pd.read_csv(uploaded_file, encoding='utf-8')
+                    except:
+                        uploaded_file.seek(0)
+                        data = pd.read_csv(uploaded_file, encoding='latin
